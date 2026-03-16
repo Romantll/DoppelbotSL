@@ -144,14 +144,6 @@
           <section class="card">
             <div class="head"><strong>Session</strong></div>
             <div class="body col">
-              <div class="col">
-                <label for="mode">Mode</label>
-                <select id="mode">
-                  <option value="mock" selected>Mock (no backend yet)</option>
-                  <option value="ws">WebSocket (plug in later)</option>
-                </select>
-              </div>
-
               <div class="actions">
                 <button class="btn" id="disconnect">Disconnect</button>
                 <button class="btn" id="clear">Clear Chat</button>
@@ -161,7 +153,8 @@
                 <label>Notes</label>
                 <ul style="margin:0 0 0 18px; padding:0; color:var(--muted)">
                   <li>Use the <b>Room Select</b> overlay to pick or create a room.</li>
-                  <li>Start in <em>Mock</em> mode; switch to <em>WebSocket</em> after backend.</li>
+                  <li>Click <b>Disconnect</b> to leave your current room.</li>
+                  <li>Click <b>Clear Chat</b> to wipe your local chat log.</li>
                 </ul>
               </div>
             </div>
