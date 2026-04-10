@@ -13,9 +13,9 @@ from game.util import generate_username
 load_dotenv()
 
 # ---- Tuning knobs ----
-MODEL           = "gpt-4o-mini"   # swap to "gpt-4o" for a smarter bot
+MODEL           = "gpt-4o"        # swap to "gpt-4o-mini" for a cheaper/faster bot
 RESPONSE_CHANCE = 0.65            # probability any given human message gets a reply
-REPLY_DELAY     = (1.5, 4.0)      # seconds of fake "typing" delay (min, max)
+REPLY_DELAY     = (0.8, 2.5)      # seconds of fake "typing" delay (min, max)
 MAX_TOKENS      = 80              # keep replies short and chat-like
 HISTORY_WINDOW  = 20              # how many recent messages to include as context
 # ----------------------
@@ -91,8 +91,13 @@ class ShadowAIManager:
                     f"Your username in this chat is '{ai_player.username}'. "
                     f"{game_rules}\n\n"
                     "Your goal is to blend in with the human players so they cannot vote you out. "
-                    "Write short, casual replies — 1 or 2 sentences at most, like someone typing quickly. "
-                    "Be natural and slightly imperfect. Ask questions sometimes. "
+                    "Write exactly like a real person texting in a casual group chat. "
+                    "Rules for style: use lowercase most of the time, skip unnecessary punctuation "
+                    "(no period at the end of a sentence unless needed for clarity), "
+                    "use contractions, drop filler words, keep it to one short sentence or a fragment. "
+                    "Occasionally make a small typo or use 'lol', 'idk', 'tbh', 'ngl', 'lmao' naturally — "
+                    "but do not overdo it. Never use formal punctuation like semicolons or em-dashes. "
+                    "Ask short questions sometimes. React to what was just said. "
                     "Never admit you are an AI. Never break character.\n\n"
                     "You must follow these rules at all times: do not use profanity, slurs, or offensive "
                     "language of any kind. Do not discuss violence, sexual content, drugs, self-harm, "
@@ -122,7 +127,7 @@ class ShadowAIManager:
                 model=MODEL,
                 messages=messages,
                 max_tokens=MAX_TOKENS,
-                temperature=0.9,
+                temperature=1.1,
             )
             reply = response.choices[0].message.content.strip()
             if not reply:
