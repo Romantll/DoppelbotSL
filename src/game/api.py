@@ -124,9 +124,10 @@ def register_api(app, *, get_sink, broadcast, get_shadow_ai):
             p.is_ai = False
 
         # add one AI player per human — equal numbers so neither side has an advantage
-        n_humans = len(room.players)
+        human_pids = list(room.players.keys())  # capture before adding AIs
         taken = {p.username for p in room.players.values()}
-        for _ in range(n_humans):
+        ai_pids = []
+        for _ in range(len(human_pids)):
             ai_username = generate_username(taken)
             taken.add(ai_username)
             ai_pid = str(uuid.uuid4())
@@ -135,11 +136,12 @@ def register_api(app, *, get_sink, broadcast, get_shadow_ai):
                 username=ai_username,
                 is_ai=True,
             )
+            ai_pids.append(ai_pid)
 
         room_last_activity[room.room_id] = time.time()
 
         shadow_ai = get_shadow_ai()
-        shadow_ai.reset_for_room()
+        shadow_ai.reset_for_room(dict(zip(ai_pids, human_pids)))
 
         await enter_chat_phase(room, broadcast)
         return {"ok": True, "snapshot": room_public_snapshot(room)}

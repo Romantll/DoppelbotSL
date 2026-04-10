@@ -1,69 +1,60 @@
 # DoppelbotSL
 
-A multiplayer social-deduction chat game built for research. Human players and AI bots share a chat room — players must identify and vote out the AI participants before the rounds run out.
+A multiplayer social deduction game built for research on human-AI interaction. Human players and AI bots share a chat room and players have to figure out who's an AI before time runs out.
 
----
+## How It Works
 
-## How the Game Works
+1. **Register** -- Enter a display name, participant ID, and age to join.
+2. **Lobby** -- Wait for the host to start. Everyone gets a random code name (like *CrimsonBadger*) so nobody knows who's who.
+3. **Game start** -- The server secretly adds one AI bot per human. A room of 4 humans becomes 8 participants (4 humans + 4 AIs), all with identical-looking names.
+4. **Chat phase** (120s) -- Everyone chats. The AIs respond automatically using a three-agent LLM pipeline.
+5. **Vote phase** (200s) -- Players vote out whoever they think is an AI. Most votes gets eliminated.
+6. **Repeat** -- Chat and vote keep alternating until the elimination count equals the number of humans, or the round limit hits.
+7. **Score screen** -- The game reveals which participants were AIs, who survived, and who won.
 
-1. **Register** — Each player enters a display name, participant ID, age, and gives consent before joining.
-2. **Lobby** — Players join a room and wait for the host to start. Each player is assigned a random code name (e.g. *CrimsonBadger*) that hides their real identity in chat.
-3. **Game start** — The server secretly adds one AI bot per human player. A room of 4 humans becomes 8 participants: 4 humans + 4 AIs, all with indistinguishable code names.
-4. **Chat phase** (120 s) — All non-eliminated participants can send messages. AI bots respond automatically.
-5. **Vote phase** (200 s) — Players vote to eliminate who they think is an AI. The participant with the most votes is eliminated.
-6. **Repeat** — Chat and vote alternate until the elimination count equals the number of original human players (e.g. 4 humans → 4 eliminations, then game ends).
-7. **Score screen** — The game reveals which participants were AI, who survived, and who won.
-
-**Humans win** if all AI players are eliminated before the game ends.
-**AI wins** if any AI survives to the final reveal.
-
----
+Humans win if all AI players get voted out. AI wins if any AI is still alive at the end.
 
 ## Tech Stack
 
-| Layer | Technology |
+| Layer | Tech |
 |---|---|
 | Backend | Python 3, FastAPI, WebSockets |
-| Frontend | Vanilla JS, HTML, CSS (no framework) |
+| Frontend | Vanilla JS, HTML, CSS |
 | Database | SQLite (WAL mode, background thread writer) |
-| AI hooks | `src/ai/shadows.py` — stub ready for LLM integration |
+| AI | OpenAI gpt-4o, three-agent pipeline in `src/ai/shadows.py` |
 | Server | Uvicorn |
-
----
 
 ## Project Structure
 
 ```
 DoppelbotSL/
 ├── frontend/
-│   ├── index.html          # Single-page app
-│   ├── app.js              # All client-side logic
+│   ├── index.html          # single-page app
+│   ├── app.js              # all client-side logic
 │   └── style.css
 ├── resources/
-│   └── requirements.txt    # Python dependencies
+│   └── requirements.txt
 └── src/
-    ├── backend_server.py   # FastAPI app entry point
+    ├── backend_server.py   # FastAPI entry point
     ├── ai/
-    │   └── shadows.py      # AI bot hooks (implement here)
+    │   └── shadows.py      # three-agent AI pipeline
     ├── backend/
-    │   └── persistence.py  # SQLite Sink (messages + players table)
+    │   └── persistence.py  # SQLite sink (messages + players)
     └── game/
-        ├── api.py          # REST endpoints (rooms, join, start)
-        ├── constants.py    # Timers, player limits, round count
-        ├── engine.py       # Phase transitions and vote resolution
+        ├── api.py          # REST endpoints
+        ├── constants.py    # timers, player limits, game rules
+        ├── engine.py       # phase transitions and vote resolution
         ├── state.py        # RoomState and Player dataclasses
-        ├── util.py         # Code-name generator, helpers
+        ├── util.py         # code name generator and helpers
         └── ws.py           # WebSocket handler
 ```
-
----
 
 ## Setup
 
 ### Requirements
 
 - Python 3.11+
-- A virtual environment (recommended)
+- An OpenAI API key
 
 ### Install
 
@@ -80,31 +71,54 @@ source .venv/bin/activate
 pip install -r resources/requirements.txt
 ```
 
+### Environment
+
+Create a `.env` file in the project root:
+
+```
+OPENAI_API_KEY=sk-...
+```
+
 ### Run
 
 ```bash
 uvicorn src.backend_server:app --reload --app-dir src
 ```
 
-Then open [http://localhost:8000](http://localhost:8000) in a browser.
-
-> The frontend is served automatically from the `frontend/` directory via FastAPI's `StaticFiles` mount.
-
----
+Open [http://localhost:8000](http://localhost:8000) in a browser. The frontend is served automatically from `frontend/`.
 
 ## Configuration
 
 Edit `src/game/constants.py` to adjust game parameters:
 
 ```python
-MIN_PLAYERS   = 3      # Minimum humans to start
-MAX_PLAYERS   = 5      # Maximum humans per room
-TOTAL_ROUNDS  = 3      # Round limit (safety cutoff)
-CHAT_SECONDS  = 120    # Chat phase duration
-VOTE_SECONDS  = 200    # Vote phase duration
+MIN_PLAYERS   = 3      # minimum humans to start
+MAX_PLAYERS   = 5      # maximum humans per room
+TOTAL_ROUNDS  = 3      # round limit (safety cutoff)
+CHAT_SECONDS  = 120    # chat phase duration
+VOTE_SECONDS  = 200    # vote phase duration
 ```
 
----
+Edit `src/ai/shadows.py` to adjust AI behavior:
+
+```python
+MODEL        = "gpt-4o"    # model to use
+REPLY_DELAY  = (0.8, 2.5)  # fake typing delay in seconds
+MAX_TOKENS   = 80          # max reply length
+HISTORY_WINDOW = 20        # how many past messages to include as context
+```
+
+## How the AI Works
+
+The AI uses a three-agent pipeline per bot per message:
+
+1. **DTR (Decide to Respond)** -- The bot decides whether to respond or stay silent based on the conversation. Not every message gets a reply, which makes the bots feel less robotic.
+
+2. **Gen (Generate)** -- If DTR says respond, the bot generates a short 1-10 word casual reply.
+
+3. **Stylizer** -- The reply gets rewritten to match the writing style of the specific human the bot is paired with. It mirrors their capitalization, punctuation habits, slang, and typos.
+
+Each AI is secretly paired with one human at game start. It tracks that human's messages throughout the game to improve style matching over time. All replies are run through OpenAI's moderation API before being sent.
 
 ## API Reference
 
@@ -112,7 +126,7 @@ VOTE_SECONDS  = 200    # Vote phase duration
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/rooms` | List all active rooms |
+| `GET` | `/api/rooms` | List active rooms |
 | `POST` | `/api/rooms` | Create a room (`{"id": "ROOM1"}`) |
 | `POST` | `/api/rooms/{id}/join` | Join a room, returns player credentials |
 | `POST` | `/api/rooms/{id}/start` | Host starts the game |
@@ -135,10 +149,11 @@ Connect at `ws://localhost:8000/ws/{room_id}/{player_id}`
 
 | Event | Payload | Description |
 |---|---|---|
-| `send_chat` | `{"text": "Hello"}` | Send a chat message |
+| `send_chat` | `{"text": "hello"}` | Send a chat message |
 | `cast_vote` | `{"targetPlayerId": "..."}` | Vote to eliminate a player |
-| `end_chat` | — | Host skips to vote phase |
-| `request_snapshot` | — | Re-fetch room state |
+| `end_chat` | -- | Host skips to vote phase |
+| `request_snapshot` | -- | Re-fetch room state |
+| `typing` | `{"isTyping": true}` | Broadcast typing indicator |
 
 **Receive:**
 
@@ -149,61 +164,33 @@ Connect at `ws://localhost:8000/ws/{room_id}/{player_id}`
 | `chat_message` | A new chat message |
 | `elimination` | A player was eliminated |
 | `vote_progress` | Running vote tally |
-| `game_over` | Game ended — includes AI reveal and scores |
-
----
+| `game_over` | Game ended with AI reveal and scores |
+| `typing` | Another player's typing indicator |
 
 ## Research Data
 
-Every join is persisted to SQLite (`src/backend/game.db`):
+Every join and message is persisted to SQLite at `src/backend/game.db`.
+
+**Players table:**
 
 | Field | Source |
 |---|---|
 | `player_id` | Server-generated UUID |
-| `room_id` | Room the player joined |
+| `room_id` | Room joined |
 | `username` | Auto-generated code name |
 | `display_name` | From registration form |
 | `participant_id` | From registration form |
 | `age` | From registration form |
 | `joined_at` | Unix timestamp |
 
-Chat messages are stored in a separate `messages` table with `room_id`, `user` (code name), `text`, and `ts`.
-
----
-
-## Implementing AI Logic
-
-All AI behavior lives in `src/ai/shadows.py`. The key hook is `on_room_message`, called every time a human sends a chat message during the CHAT phase.
-
-```python
-async def on_room_message(self, room_id, human_sender_player_id,
-                           human_sender_username, human_text,
-                           room, conversation_history, game_rules):
-    # Dan's variables:
-    # human_text          -> the message just sent by a human
-    # conversation_history -> list of {"user", "text", "ts"} dicts
-    # game_rules           -> string describing the full game loop
-    #
-    # Pick an alive AI player and respond:
-    #   alive_ais = [p for p in room.players.values() if p.is_ai and not p.eliminated]
-    #   ai_player = random.choice(alive_ais)
-    #   await self._send_chat(room_id, ai_player.username, reply)
-```
-
-The placeholder currently echoes a message from a randomly selected alive AI. Replace the placeholder with a real LLM call to make the bots convincing.
-
-> AI players are real participants in `room.players` with `is_ai=True`. They appear in chat and in the vote list. Their identity is hidden from the frontend — clients cannot distinguish them from human players.
-
----
+**Messages table:** `room_id`, `user` (code name), `text`, `ts`
 
 ## Game State Machine
 
 ```
-LOBBY → CHAT → VOTE → CHAT → VOTE → ... → SCORE
-                 ↑_____________|
-                 (repeats each round)
+LOBBY -> CHAT -> VOTE -> CHAT -> VOTE -> ... -> SCORE
+                  ^______________|
+                  (repeats each round)
 ```
 
-The game ends (moves to SCORE) when:
-- The number of surviving players equals the original human count, **or**
-- The round limit (`TOTAL_ROUNDS`) is reached
+The game ends when the number of surviving players equals the original human count, or the round limit is reached.
